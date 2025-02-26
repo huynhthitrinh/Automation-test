@@ -1,59 +1,33 @@
-// @ts-check
-const { test, expect } = require('@playwright/test'); //import các engine của các trình duyệt từ playwright chẳng hạn như chromium
-const { fail } = require('assert');
-// @ts-ignore
-const { Console } = require('console');
-const { get } = require('http');
+import {expect, test} from '@playwright/test'; //import các engine của các trình duyệt từ playwright chẳng hạn như chromium
 
 test.beforeEach(async ({page}) => {
-    
+
     await page.goto('https://www.proto-hogashop.ch/login/form');
-    await page.locator("//input[@placeholder='User name']").fill("trinhUser");
-    await page.locator("//input[@placeholder='Password']").fill("Trinhhuynh_123");
-    await page.locator('//button[text()="Log in"]').click();
-    await page.locator('//a[text()="trinhhuynh"]').click();
+    await page.locator('#login').fill("trinhUser");
+    await page.locator('#password').fill("Trinhhuynh_123");
+    await page.locator('button', {hasText: 'Log in'}).click();
+    await page.locator('[data-test-id="departments-table-dep-name"]', {hasText: 'trinhhuynh'}).click();
+    await expect(page.locator('[data-test-id="widget-last-order-time"]')).toBeVisible();
 
-    });
-
-test('Search Poduct', async ({page})=> {
-
-    await page.waitForSelector('//*[@id="widgets"]/div[4]/div[1]/div[2]/div/div[1]/h4');
-    await expect(page.locator('//*[@id="widgets"]/div[4]/div[1]/div[2]/div/div[1]/h4')).toBeVisible();
-    if (await page.getByText('order overview').isVisible())
-        console.log("go to Hogashop");
-    else
-        console.log("don't go to Hogashop!");
-    
-    await page.screenshot({ path: 'screenshot/GotoHomePage.png' });
-     //go to catalogue page
-     await page.locator('//span[text()="Product catalogue"]').click();
-     //input search field
-     const text = 'Bath';
-     await page.locator('//input[@placeholder="Enter search string …"]').fill(text);
-     //click search button 
-     await page.locator("//button[text()='Search']").click();
-     await page.waitForTimeout(3000)
-     await page.screenshot({ path: 'screenshot/SearchResult.png' })
-    // count number of element in search result list
-    await page.waitForSelector('//tr[@data-row-type="product"]');
-    const CountRow = await page.locator('//tr[@data-row-type="product"]').count();
-   
-    console.log('have', CountRow, 'element');
-    
-    // get text in search result and compare
-    for (let count = 1; count <=  CountRow; count ++){
-        await page.waitForSelector('//div[@data-test-id="description-container"]');
-        const gettext = await page.locator('//tr[@data-row-type="product"]['+count+']//div[@data-test-id="description-container"]//a[@class="c-item-details__name"]').textContent();
-        console.log(gettext)
-        if (gettext?.includes(text))
-            console.log("successfull");
-        else
-            console.log("fail");
-        
-    }
-    
 });
-// test('Add product to basket', async ({page}) => {
-//     await page.locator('//span[text()="Product catalogue"]').click();
 
-//     });
+test('Search product', async ({page}) => {
+    const testData = {productName: 'Bath'};
+    //go to catalogue page
+    await page.locator('[data-ga-label="product_search"]').click();
+    await page.waitForSelector('[data-test-id="list-of-products"]');
+    //input search field
+    await page.locator('[name="search-input"]').fill(testData.productName);
+    //click search button
+    const foundProductsCountResponsePromise = page.waitForResponse(`**/available-products/count?*${testData.productName}?*`);
+    await page.locator('[data-test-id="run-search"]').click();
+    const foundProductsCountResponse = await foundProductsCountResponsePromise;
+    await expect(foundProductsCountResponse.status()).toBe(200)
+    // count number of element in search result list
+    await page.waitForSelector('[data-test-id^="product_"]');
+    await expect(page.locator('[data-test-id^="product_"]')).toHaveCount(2);
+
+    (await (page.locator('[data-test-id^="product_"]').locator('[data-test-id="product-name"]').allInnerTexts())).forEach(productName => {
+        expect(productName).toContain(testData.productName)
+    })
+});
